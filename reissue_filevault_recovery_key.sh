@@ -21,33 +21,33 @@
 
 # (Optional) Path to a logo that will be used in messaging. Recommend 512px,
 # PNG format. If no logo is provided, the FileVault icon will be used.
-LOGO=""
+LOGO="/Library/TL/TL_Avatar.png"
 
 # The title of the message that will be displayed to the user.
 # Not too long, or it'll get clipped.
-PROMPT_TITLE="Encryption Key Escrow"
+PROMPT_TITLE="FileVault Recovery Key Update"
 
 # The body of the message that will be displayed before prompting the user for
 # their password. All message strings below can be multiple lines.
-PROMPT_MESSAGE="Your Mac's FileVault encryption key needs to be escrowed by PretendCo IT.
+PROMPT_MESSAGE="Your Mac's FileVault recovery key needs to be updated to meet securirty requirements.
 
-Click the Next button below, then enter your Mac's password when prompted."
+Click the Next button below, then enter your Mac's current password when prompted to allow for the recovery key to be updated."
 
 # The body of the message that will be displayed after 5 incorrect passwords.
 FORGOT_PW_MESSAGE="You made five incorrect password attempts.
 
-Please contact the Help Desk at 555-1212 for help with your Mac password."
+Please email Tracelink IT at helpdesk@tracelink.com."
 
 # The body of the message that will be displayed after successful completion.
-SUCCESS_MESSAGE="Thank you! Your FileVault key has been escrowed."
+SUCCESS_MESSAGE="Thank you! You have succesfully updated your recovery key."
 
 # The body of the message that will be displayed if a failure occurs.
-FAIL_MESSAGE="Sorry, an error occurred while escrowing your FileVault key. Please contact the Help Desk at 555-1212 for help."
+FAIL_MESSAGE="Sorry, an error occurred while updating your FileVault recovery key. Please contact the Tracelink IT at helpdesk@tracelink.com for help."
 
 # Optional but recommended: The profile identifiers of the FileVault Key
 # Redirection profiles (e.g. ABCDEF12-3456-7890-ABCD-EF1234567890).
 PROFILE_IDENTIFIER_10_12="" # 10.12 and earlier
-PROFILE_IDENTIFIER_10_13="" # 10.13 and later
+PROFILE_IDENTIFIER_10_13="670C5506-36FB-403B-A9CB-A6E43391F331" # 10.13 and later
 
 
 ###############################################################################
