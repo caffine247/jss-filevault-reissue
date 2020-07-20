@@ -29,7 +29,7 @@ PROMPT_TITLE="FileVault Recovery Key Update"
 
 # The body of the message that will be displayed before prompting the user for
 # their password. All message strings below can be multiple lines.
-PROMPT_MESSAGE="Your Mac's FileVault recovery key needs to be updated to meet securirty requirements.
+PROMPT_MESSAGE="Your Mac's FileVault recovery key needs to be updated to meet TraceLink securirty requirements.
 
 Click the Next button below, then enter your Mac's current password when prompted to allow for the recovery key to be updated."
 
@@ -42,7 +42,7 @@ Please email Tracelink IT at helpdesk@tracelink.com."
 SUCCESS_MESSAGE="Thank you! You have succesfully updated your recovery key."
 
 # The body of the message that will be displayed if a failure occurs.
-FAIL_MESSAGE="Sorry, an error occurred while updating your FileVault recovery key. Please contact the Tracelink IT at helpdesk@tracelink.com for help."
+FAIL_MESSAGE="Sorry, an error occurred while updating your FileVault recovery key. Please contact Tracelink IT at helpdesk@tracelink.com for assistance."
 
 # Optional but recommended: The profile identifiers of the FileVault Key
 # Redirection profiles (e.g. ABCDEF12-3456-7890-ABCD-EF1234567890).
