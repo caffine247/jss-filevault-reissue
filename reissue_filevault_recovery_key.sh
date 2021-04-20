@@ -71,7 +71,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Check for remote users.
-REMOTE_USERS=$(/usr/bin/who | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | wc -l)
+REMOTE_USERS=$(/usr/bin/who | /usr/bin/grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | wc -l)
 if [[ $REMOTE_USERS -gt 0 ]]; then
     REASON="Remote users are logged in."
     BAILOUT=true
@@ -90,37 +90,37 @@ fi
 # Check the OS version.
 OS_MAJOR=$(/usr/bin/sw_vers -productVersion | awk -F . '{print $1}')
 OS_MINOR=$(/usr/bin/sw_vers -productVersion | awk -F . '{print $2}')
-if [[ "$OS_MAJOR" -ne 10 || "$OS_MINOR" -lt 9 ]]; then
-    REASON="This script requires macOS 10.9 or higher. This Mac has $(sw_vers -productVersion)."
+if [[ "$OS_MAJOR" -eq 11 ]] || [[ "$OS_MAJOR" -eq 10 && "$OS_MINOR" -eq 16 ]]; then
+    echo "[WARNING] This script has not been tested on macOS Big Sur. Use at your own risk."
+elif [[ "$OS_MAJOR" -eq 10 && "$OS_MINOR" -lt 9 ]]; then
+    REASON="This script requires macOS 10.9 or higher. This Mac has $(/usr/bin/sw_vers -productVersion)."
     BAILOUT=true
-elif [[ "$OS_MAJOR" -eq 10 && "$OS_MINOR" -ge 15 ]]; then
-    echo "[WARNING] This script is not yet supported on macOS Catalina. Use at your own risk."
 fi
 
 # Check to see if the encryption process is complete
 FV_STATUS="$(/usr/bin/fdesetup status)"
-if grep -q "Encryption in progress" <<< "$FV_STATUS"; then
+if /usr/bin/grep -q "Encryption in progress" <<< "$FV_STATUS"; then
     REASON="FileVault encryption is in progress. Please run the script again when it finishes."
     BAILOUT=true
-elif grep -q "FileVault is Off" <<< "$FV_STATUS"; then
+elif /usr/bin/grep -q "FileVault is Off" <<< "$FV_STATUS"; then
     REASON="Encryption is not active."
     BAILOUT=true
-elif ! grep -q "FileVault is On" <<< "$FV_STATUS"; then
+elif ! /usr/bin/grep -q "FileVault is On" <<< "$FV_STATUS"; then
     REASON="Unable to determine encryption status."
     BAILOUT=true
 fi
 
 # Get the logged in user's name
-CURRENT_USER=$(/usr/bin/python -c 'from SystemConfiguration import SCDynamicStoreCopyConsoleUser; import sys; username = (SCDynamicStoreCopyConsoleUser(None, None, None) or [None])[0]; username = [username,""][username in [u"loginwindow", None, u""]]; sys.stdout.write(username);')
+CURRENT_USER=$(/bin/echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/&&!/loginwindow/{print $3}')
 
 # Make sure there's an actual user logged in
-if [[ -z $CURRENT_USER || "$CURRENT_USER" == "root" ]]; then
+if [[ -z $CURRENT_USER || "$CURRENT_USER" == "loginwindow" || "$CURRENT_USER" == "root" ]]; then
     REASON="No user is currently logged in."
     BAILOUT=true
 else
     # Make sure logged in account is already authorized with FileVault 2
     FV_USERS="$(/usr/bin/fdesetup list)"
-    if ! egrep -q "^${CURRENT_USER}," <<< "$FV_USERS"; then
+    if ! /usr/bin/grep -E -q "^${CURRENT_USER}," <<< "$FV_USERS"; then
         REASON="$CURRENT_USER is not on the list of FileVault enabled users: $FV_USERS"
         BAILOUT=true
     fi
@@ -129,14 +129,14 @@ fi
 # If specified, the FileVault key redirection profile needs to be installed.
 if [[ "$OS_MAJOR" -eq 10 && "$OS_MINOR" -le 12 ]]; then
     if [[ "$PROFILE_IDENTIFIER_10_12" != "" ]]; then
-        if ! /usr/bin/profiles -Cv | grep -q "profileIdentifier: $PROFILE_IDENTIFIER_10_12"; then
+        if ! /usr/bin/profiles -Cv | /usr/bin/grep -q "profileIdentifier: $PROFILE_IDENTIFIER_10_12"; then
             REASON="The FileVault Key Redirection profile is not yet installed."
             BAILOUT=true
         fi
     fi
 elif [[ "$OS_MAJOR" -eq 10 && "$OS_MINOR" -gt 12 ]]; then
     if [[ "$PROFILE_IDENTIFIER_10_13" != "" ]]; then
-        if ! /usr/bin/profiles -Cv | grep -q "profileIdentifier: $PROFILE_IDENTIFIER_10_13"; then
+        if ! /usr/bin/profiles -Cv | /usr/bin/grep -q "profileIdentifier: $PROFILE_IDENTIFIER_10_13"; then
             REASON="The FileVault Key Redirection profile is not yet installed."
             BAILOUT=true
         fi
@@ -149,19 +149,34 @@ fi
 # Validate logo file. If no logo is provided or if the file cannot be found at
 # specified path, default to the FileVault icon.
 if [[ -z "$LOGO" ]] || [[ ! -f "$LOGO" ]]; then
-    /bin/echo "No logo provided, or no logo exists at specified path. Using FileVault icon."
-    LOGO="/System/Library/PreferencePanes/Security.prefPane/Contents/Resources/FileVault.icns"
+    if [[ -f "/System/Library/PreferencePanes/Security.prefPane/Contents/Resources/FileVault.icns" ]]; then
+        /bin/echo "No logo provided, or no logo exists at specified path. Using FileVault icon."
+        LOGO="/System/Library/PreferencePanes/Security.prefPane/Contents/Resources/FileVault.icns"
+    elif [[ -f "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/FileVaultIcon.icns" ]]; then
+        /bin/echo "No logo provided, or no logo exists at specified path. Using FileVault icon."
+        LOGO="/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/FileVaultIcon.icns"
+    elif [[ -f "/System/Library/PreferencePanes/Security.prefPane/Contents/XPCServices/com.apple.preference.security.remoteservice.xpc/Contents/Resources/FileVault.icns" ]]; then
+        /bin/echo "No logo provided, or no logo exists at specified path. Using FileVault icon."
+        LOGO="/System/Library/PreferencePanes/Security.prefPane/Contents/XPCServices/com.apple.preference.security.remoteservice.xpc/Contents/Resources/FileVault.icns"
+    elif [[ -f "/System/Library/PreferencePanes/Security.prefPane/Contents/Resources/SystemPreferences_Security.tiff" ]]; then
+        /bin/echo "No logo provided, or no logo exists at specified path. Using FileVault icon."
+        LOGO="/System/Library/PreferencePanes/Security.prefPane/Contents/Resources/SystemPreferences_Security.tiff"
+    else
+        REASON="No suitable logo could be found."
+        BAILOUT=true
+    fi
 fi
 
 # Convert POSIX path of logo icon to Mac path for AppleScript.
 LOGO_POSIX="$(/usr/bin/osascript -e 'tell application "System Events" to return POSIX file "'"$LOGO"'" as text')"
 
 # Get information necessary to display messages in the current user's context.
+# Using both `launchctl` and `sudo -u` per this example: https://scriptingosx.com/2020/08/running-a-command-as-another-user/
 USER_ID=$(/usr/bin/id -u "$CURRENT_USER")
 if [[ "$OS_MAJOR" -eq 10 && "$OS_MINOR" -le 9 ]]; then
     L_ID=$(/usr/bin/pgrep -x -u "$USER_ID" loginwindow)
     L_METHOD="bsexec"
-elif [[ "$OS_MAJOR" -eq 10 && "$OS_MINOR" -gt 9 ]]; then
+else
     L_ID=$USER_ID
     L_METHOD="asuser"
 fi
@@ -169,34 +184,34 @@ fi
 # If any error occurred in the validation section, bail out.
 if [[ "$BAILOUT" == "true" ]]; then
     echo "[ERROR]: $REASON"
-    launchctl "$L_METHOD" "$L_ID" "$jamfHelper" -windowType "utility" -icon "$LOGO" -title "$PROMPT_TITLE" -description "$FAIL_MESSAGE: $REASON" -button1 'OK' -defaultButton 1 -startlaunchd &>/dev/null &
+    launchctl "$L_METHOD" "$L_ID" sudo -u "$CURRENT_USER" "$jamfHelper" -windowType "utility" -icon "$LOGO" -title "$PROMPT_TITLE" -description "$FAIL_MESSAGE: $REASON" -button1 'OK' -defaultButton 1 -startlaunchd &>/dev/null &
     exit 1
 fi
 
 # Display a branded prompt explaining the password prompt.
 echo "Alerting user $CURRENT_USER about incoming password prompt..."
-/bin/launchctl "$L_METHOD" "$L_ID" "$jamfHelper" -windowType "utility" -icon "$LOGO" -title "$PROMPT_TITLE" -description "$PROMPT_MESSAGE" -button1 "Next" -defaultButton 1 -startlaunchd &>/dev/null
+/bin/launchctl "$L_METHOD" "$L_ID" sudo -u "$CURRENT_USER" "$jamfHelper" -windowType "utility" -icon "$LOGO" -title "$PROMPT_TITLE" -description "$PROMPT_MESSAGE" -button1 "Next" -defaultButton 1 -startlaunchd &>/dev/null
 
 # Get the logged in user's password via a prompt.
 echo "Prompting $CURRENT_USER for their Mac password..."
-USER_PASS="$(/bin/launchctl "$L_METHOD" "$L_ID" /usr/bin/osascript -e 'display dialog "Please enter the password you use to log in to your Mac:" default answer "" with title "'"${PROMPT_TITLE//\"/\\\"}"'" giving up after 86400 with text buttons {"OK"} default button 1 with hidden answer with icon file "'"${LOGO_POSIX//\"/\\\"}"'"' -e 'return text returned of result')"
+USER_PASS="$(/bin/launchctl "$L_METHOD" "$L_ID" sudo -u "$CURRENT_USER" /usr/bin/osascript -e 'display dialog "Please enter the password you use to log in to your Mac:" default answer "" with title "'"${PROMPT_TITLE//\"/\\\"}"'" giving up after 86400 with text buttons {"OK"} default button 1 with hidden answer with icon file "'"${LOGO_POSIX//\"/\\\"}"'"' -e 'return text returned of result')"
 
 # Thanks to James Barclay (@futureimperfect) for this password validation loop.
 TRY=1
 until /usr/bin/dscl /Search -authonly "$CURRENT_USER" "$USER_PASS" &>/dev/null; do
     (( TRY++ ))
     echo "Prompting $CURRENT_USER for their Mac password (attempt $TRY)..."
-    USER_PASS="$(/bin/launchctl "$L_METHOD" "$L_ID" /usr/bin/osascript -e 'display dialog "Sorry, that password was incorrect. Please try again:" default answer "" with title "'"${PROMPT_TITLE//\"/\\\"}"'" giving up after 86400 with text buttons {"OK"} default button 1 with hidden answer with icon file "'"${LOGO_POSIX//\"/\\\"}"'"' -e 'return text returned of result')"
+    USER_PASS="$(/bin/launchctl "$L_METHOD" "$L_ID" sudo -u "$CURRENT_USER" /usr/bin/osascript -e 'display dialog "Sorry, that password was incorrect. Please try again:" default answer "" with title "'"${PROMPT_TITLE//\"/\\\"}"'" giving up after 86400 with text buttons {"OK"} default button 1 with hidden answer with icon file "'"${LOGO_POSIX//\"/\\\"}"'"' -e 'return text returned of result')"
     if (( TRY >= 5 )); then
         echo "[ERROR] Password prompt unsuccessful after 5 attempts. Displaying \"forgot password\" message..."
-        /bin/launchctl "$L_METHOD" "$L_ID" "$jamfHelper" -windowType "utility" -icon "$LOGO" -title "$PROMPT_TITLE" -description "$FORGOT_PW_MESSAGE" -button1 'OK' -defaultButton 1 -startlaunchd &>/dev/null &
+        /bin/launchctl "$L_METHOD" "$L_ID" sudo -u "$CURRENT_USER" "$jamfHelper" -windowType "utility" -icon "$LOGO" -title "$PROMPT_TITLE" -description "$FORGOT_PW_MESSAGE" -button1 'OK' -defaultButton 1 -startlaunchd &>/dev/null &
         exit 1
     fi
 done
 echo "Successfully prompted for Mac password."
 
 # If needed, unload and kill FDERecoveryAgent.
-if /bin/launchctl list | grep -q "com.apple.security.FDERecoveryAgent"; then
+if /bin/launchctl list | /usr/bin/grep -q "com.apple.security.FDERecoveryAgent"; then
     echo "Unloading FDERecoveryAgent LaunchDaemon..."
     /bin/launchctl unload /System/Library/LaunchDaemons/com.apple.security.FDERecoveryAgent.plist
 fi
@@ -213,7 +228,7 @@ USER_PASS=${USER_PASS//\"/&quot;}
 USER_PASS=${USER_PASS//\'/&apos;}
 
 # For 10.13's escrow process, store the last modification time of /var/db/FileVaultPRK.dat
-if [[ "$OS_MINOR" -ge 13 ]]; then
+if [[ "$OS_MAJOR" -eq 11 ]] || [[ "$OS_MAJOR" -eq 10 && "$OS_MINOR" -ge 13 ]]; then
     echo "Checking for /var/db/FileVaultPRK.dat on macOS 10.13+..."
     PRK_MOD=0
     if [ -e "/var/db/FileVaultPRK.dat" ]; then
@@ -244,7 +259,7 @@ FDESETUP_RESULT=$?
 unset USER_PASS
 
 # Differentiate <=10.12 and >=10.13 success conditions
-if [[ "$OS_MINOR" -ge 13 ]]; then
+if [[ "$OS_MAJOR" -eq 11 ]] || [[ "$OS_MAJOR" -eq 10 && "$OS_MINOR" -ge 13 ]]; then
     # Check new modification time of of FileVaultPRK.dat
     ESCROW_STATUS=1
     if [ -e "/var/db/FileVaultPRK.dat" ]; then
@@ -258,7 +273,7 @@ if [[ "$OS_MINOR" -ge 13 ]]; then
     fi
 else
     # Check output of fdesetup command for indication of an escrow attempt
-    grep -q "Escrowing recovery key..." <<< "$FDESETUP_OUTPUT"
+    /usr/bin/grep -q "Escrowing recovery key..." <<< "$FDESETUP_OUTPUT"
     ESCROW_STATUS=$?
 fi
 
@@ -268,16 +283,16 @@ if [[ $FDESETUP_RESULT -ne 0 ]]; then
     echo "See this page for a list of fdesetup exit codes and their meaning:"
     echo "https://developer.apple.com/legacy/library/documentation/Darwin/Reference/ManPages/man8/fdesetup.8.html"
     echo "Displaying \"failure\" message..."
-    /bin/launchctl "$L_METHOD" "$L_ID" "$jamfHelper" -windowType "utility" -icon "$LOGO" -title "$PROMPT_TITLE" -description "$FAIL_MESSAGE: fdesetup exited with code $FDESETUP_RESULT. Output: $FDESETUP_OUTPUT" -button1 'OK' -defaultButton 1 -startlaunchd &>/dev/null &
+    /bin/launchctl "$L_METHOD" "$L_ID" sudo -u "$CURRENT_USER" "$jamfHelper" -windowType "utility" -icon "$LOGO" -title "$PROMPT_TITLE" -description "$FAIL_MESSAGE: fdesetup exited with code $FDESETUP_RESULT. Output: $FDESETUP_OUTPUT" -button1 'OK' -defaultButton 1 -startlaunchd &>/dev/null &
 elif [[ $ESCROW_STATUS -ne 0 ]]; then
     [[ -n "$FDESETUP_OUTPUT" ]] && echo "$FDESETUP_OUTPUT"
     echo "[WARNING] FileVault key was generated, but escrow cannot be confirmed. Please verify that the redirection profile is installed and the Mac is connected to the internet."
     echo "Displaying \"failure\" message..."
-    /bin/launchctl "$L_METHOD" "$L_ID" "$jamfHelper" -windowType "utility" -icon "$LOGO" -title "$PROMPT_TITLE" -description "$FAIL_MESSAGE: New key generated, but escrow did not occur." -button1 'OK' -defaultButton 1 -startlaunchd &>/dev/null &
+    /bin/launchctl "$L_METHOD" "$L_ID" sudo -u "$CURRENT_USER" "$jamfHelper" -windowType "utility" -icon "$LOGO" -title "$PROMPT_TITLE" -description "$FAIL_MESSAGE: New key generated, but escrow did not occur." -button1 'OK' -defaultButton 1 -startlaunchd &>/dev/null &
 else
     [[ -n "$FDESETUP_OUTPUT" ]] && echo "$FDESETUP_OUTPUT"
     echo "Displaying \"success\" message..."
-    /bin/launchctl "$L_METHOD" "$L_ID" "$jamfHelper" -windowType "utility" -icon "$LOGO" -title "$PROMPT_TITLE" -description "$SUCCESS_MESSAGE" -button1 'OK' -defaultButton 1 -startlaunchd &>/dev/null &
+    /bin/launchctl "$L_METHOD" "$L_ID" sudo -u "$CURRENT_USER" "$jamfHelper" -windowType "utility" -icon "$LOGO" -title "$PROMPT_TITLE" -description "$SUCCESS_MESSAGE" -button1 'OK' -defaultButton 1 -startlaunchd &>/dev/null &
 fi
 
 exit $FDESETUP_RESULT
