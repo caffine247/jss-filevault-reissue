@@ -11,8 +11,8 @@
 #                   be deployed in order for this script to work correctly.
 #          Author:  Elliot Jordan <elliot@elliotjordan.com>
 #         Created:  2015-01-05
-#   Last Modified:  2020-12-18
-#         Version:  1.10.0
+#   Last Modified:  2022-10-21
+#         Version:  1.12.2
 #
 ###
 
@@ -21,17 +21,16 @@
 
 # (Optional) Path to a logo that will be used in messaging. Recommend 512px,
 # PNG format. If no logo is provided, the FileVault icon will be used.
-LOGO="/Library/TL/TL_Avatar.png"
+LOGO="/Library/TL/TL_Avatar__White.png"
 
 # The title of the message that will be displayed to the user.
 # Not too long, or it'll get clipped.
-PROMPT_TITLE="FileVault Recovery Key Update"
+PROMPT_TITLE="System Password Update"
 
 # The body of the message that will be displayed before prompting the user for
 # their password. All message strings below can be multiple lines.
-PROMPT_MESSAGE="Your Mac's FileVault recovery key needs to be updated to meet TraceLink securirty requirements.
-
-Click the Next button below, then enter your Mac's current password when prompted to allow for the recovery key to be updated."
+PROMPT_MESSAGE="Now that you have updated your Tracelink Password, let's ensure it's updated on your computer.  
+When prompted please enter your NEW Tracelink Password."
 
 # The body of the message that will be displayed after 5 incorrect passwords.
 FORGOT_PW_MESSAGE="You made five incorrect password attempts.
@@ -39,15 +38,16 @@ FORGOT_PW_MESSAGE="You made five incorrect password attempts.
 Please email Tracelink IT at helpdesk@tracelink.com."
 
 # The body of the message that will be displayed after successful completion.
-SUCCESS_MESSAGE="Thank you! You have succesfully updated your recovery key."
+SUCCESS_MESSAGE="Excellent your new password is now updated. 
+To confirm please lock your computer, and unlock with your new password."
 
 # The body of the message that will be displayed if a failure occurs.
-FAIL_MESSAGE="Sorry, an error occurred while updating your FileVault recovery key. Please contact Tracelink IT at helpdesk@tracelink.com for assistance."
+FAIL_MESSAGE="Sorry, an error occurred while escrowing your FileVault key. Please contact the Help Desk at 555-1212 for help."
 
 # Optional but recommended: The profile identifiers of the FileVault Key
 # Redirection profiles (e.g. ABCDEF12-3456-7890-ABCD-EF1234567890).
 PROFILE_IDENTIFIER_10_12="" # 10.12 and earlier
-PROFILE_IDENTIFIER_10_13="670C5506-36FB-403B-A9CB-A6E43391F331" # 10.13 and later
+PROFILE_IDENTIFIER_10_13="422643DC-BE5D-47FA-8614-BEF9ED38E6C6" # 10.13 and later
 
 
 ###############################################################################
@@ -90,7 +90,7 @@ fi
 # Check the OS version.
 OS_MAJOR=$(/usr/bin/sw_vers -productVersion | awk -F . '{print $1}')
 OS_MINOR=$(/usr/bin/sw_vers -productVersion | awk -F . '{print $2}')
-if [[ "$OS_MAJOR" -ge 12 ]]; then
+if [[ "$OS_MAJOR" -ge 13 ]]; then
     echo "[WARNING] This script has not been tested on this version of macOS. Use at your own risk."
 elif [[ "$OS_MAJOR" -eq 10 && "$OS_MINOR" -lt 9 ]]; then
     REASON="This script requires macOS 10.9 or higher. This Mac has $(/usr/bin/sw_vers -productVersion)."
@@ -111,7 +111,9 @@ elif ! /usr/bin/grep -q "FileVault is On" <<< "$FV_STATUS"; then
 fi
 
 # Get the logged in user's name
-CURRENT_USER=$(/bin/echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/&&!/loginwindow/{print $3}')
+# Supports aliases created by Jamf Connect: https://github.com/homebysix/jss-filevault-reissue/issues/48
+CURRENT_USER_ALIAS=$(/bin/echo "show State:/Users/ConsoleUser" | /usr/sbin/scutil | /usr/bin/awk '/Name :/&&!/loginwindow/{print $3}')
+CURRENT_USER=$(id -un "$CURRENT_USER_ALIAS")
 
 # Make sure there's an actual user logged in
 if [[ -z $CURRENT_USER || "$CURRENT_USER" == "loginwindow" || "$CURRENT_USER" == "root" ]]; then
@@ -168,7 +170,7 @@ if [[ -z "$LOGO" ]] || [[ ! -f "$LOGO" ]]; then
 fi
 
 # Convert POSIX path of logo icon to Mac path for AppleScript.
-LOGO_POSIX="$(/usr/bin/osascript -e 'tell application "System Events" to return POSIX file "'"$LOGO"'" as text')"
+LOGO_POSIX="$(/usr/bin/osascript -e 'return POSIX file "'"$LOGO"'" as text')"
 
 # Get information necessary to display messages in the current user's context.
 # Using both `launchctl` and `sudo -u` per this example: https://scriptingosx.com/2020/08/running-a-command-as-another-user/
@@ -194,7 +196,7 @@ echo "Alerting user $CURRENT_USER about incoming password prompt..."
 
 # Get the logged in user's password via a prompt.
 echo "Prompting $CURRENT_USER for their Mac password..."
-USER_PASS="$(/bin/launchctl "$L_METHOD" "$L_ID" sudo -u "$CURRENT_USER" /usr/bin/osascript -e 'display dialog "Please enter the password you use to log in to your Mac:" default answer "" with title "'"${PROMPT_TITLE//\"/\\\"}"'" giving up after 86400 with text buttons {"OK"} default button 1 with hidden answer with icon file "'"${LOGO_POSIX//\"/\\\"}"'"' -e 'return text returned of result')"
+USER_PASS="$(/bin/launchctl "$L_METHOD" "$L_ID" sudo -u "$CURRENT_USER" /usr/bin/osascript -e 'display dialog "Please enter your new password:" default answer "" with title "'"${PROMPT_TITLE//\"/\\\"}"'" giving up after 86400 with text buttons {"OK"} default button 1 with hidden answer with icon file "'"${LOGO_POSIX//\"/\\\"}"'"' -e 'return text returned of result')"
 
 # Thanks to James Barclay (@futureimperfect) for this password validation loop.
 TRY=1
